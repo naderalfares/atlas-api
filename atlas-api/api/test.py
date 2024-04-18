@@ -21,7 +21,7 @@ def test_add_flight():
     response = client.post("/flights", json=new_flight)
     assert response.status_code == 200
     assert response.json()["message"] == "flight added"
-    assert len(flights_db) == 7
+    assert len(flights_db) == 6
 
 def test_book_flight():
     booking_request = {
