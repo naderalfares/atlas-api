@@ -1,13 +1,20 @@
 import pytest
 from fastapi.testclient import TestClient
-from .main import app, flights_db, booked_flights_db, Flight, BookingRequest
+from .main import DEFAULT_FLIGHTS, app, reset_storage_for_tests
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def reset_storage():
+    reset_storage_for_tests()
+    yield
+
 
 def test_get_flights():
     response = client.get("/flights")
     assert response.status_code == 200
-    assert response.json() == flights_db
+    assert response.json() == DEFAULT_FLIGHTS
 
 def test_add_flight():
     new_flight = {
@@ -21,7 +28,8 @@ def test_add_flight():
     response = client.post("/flights", json=new_flight)
     assert response.status_code == 200
     assert response.json()["message"] == "flight added"
-    assert len(flights_db) == 6
+    flights_response = client.get("/flights")
+    assert len(flights_response.json()) == len(DEFAULT_FLIGHTS) + 1
 
 def test_book_flight():
     booking_request = {
@@ -31,12 +39,17 @@ def test_book_flight():
     }
     response = client.post("/book-flight/", json=booking_request)
     assert response.status_code == 200
-    assert len(booked_flights_db) == 1
+    booked_response = client.get("/booked-flights")
+    assert len(booked_response.json()) == 1
 
 def test_get_booked_flights():
+    booking_request = {
+        "flight_id": 1,
+        "passenger_name": "John Doe",
+        "passenger_email": "john@example.com",
+    }
+    client.post("/book-flight/", json=booking_request)
     response = client.get("/booked-flights")
     assert response.status_code == 200
     assert len(response.json()) == 1
     assert response.json()[0]["flight_id"] == 1
-
-
