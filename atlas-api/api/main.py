@@ -95,64 +95,69 @@ FLIGHTS_KEY = "flights"
 BOOKED_FLIGHTS_KEY = "booked_flights"
 DB_PATH = Path(__file__).resolve().parent / "storage.db"
 db = pickledb.PickleDB(str(DB_PATH))
-db.load()
 
 
-def _initialize_storage() -> None:
-    existing_keys = set(db.all())
+async def _initialize_storage() -> None:
+    existing_keys = set(await db.all())
     if FLIGHTS_KEY not in existing_keys:
-        db.set(FLIGHTS_KEY, DEFAULT_FLIGHTS.copy())
+        await db.set(FLIGHTS_KEY, DEFAULT_FLIGHTS.copy())
     if BOOKED_FLIGHTS_KEY not in existing_keys:
-        db.set(BOOKED_FLIGHTS_KEY, [])
-    db.save()
+        await db.set(BOOKED_FLIGHTS_KEY, [])
+    await db.save()
 
 
-def _get_flights() -> List[Dict[str, Any]]:
-    return db.get(FLIGHTS_KEY) or []
+async def _get_flights() -> List[Dict[str, Any]]:
+    return await db.get(FLIGHTS_KEY, [])
 
 
-def _set_flights(flights: List[Dict[str, Any]]) -> None:
-    db.set(FLIGHTS_KEY, flights)
-    db.save()
+async def _set_flights(flights: List[Dict[str, Any]]) -> None:
+    await db.set(FLIGHTS_KEY, flights)
+    await db.save()
 
 
-def _get_booked_flights() -> List[Dict[str, Any]]:
-    return db.get(BOOKED_FLIGHTS_KEY) or []
+async def _get_booked_flights() -> List[Dict[str, Any]]:
+    return await db.get(BOOKED_FLIGHTS_KEY, [])
 
 
-def _set_booked_flights(booked_flights: List[Dict[str, Any]]) -> None:
-    db.set(BOOKED_FLIGHTS_KEY, booked_flights)
-    db.save()
+async def _set_booked_flights(booked_flights: List[Dict[str, Any]]) -> None:
+    await db.set(BOOKED_FLIGHTS_KEY, booked_flights)
+    await db.save()
 
 
 def reset_storage_for_tests() -> None:
     """Reset persistent storage to a known state for test isolation."""
-    _set_flights(DEFAULT_FLIGHTS.copy())
-    _set_booked_flights([])
+    db.db = {
+        FLIGHTS_KEY: DEFAULT_FLIGHTS.copy(),
+        BOOKED_FLIGHTS_KEY: [],
+    }
+    db.save()
 
 
-_initialize_storage()
+@app.on_event("startup")
+async def startup_event() -> None:
+    await db.load()
+    await _initialize_storage()
 
 
 @app.get("/flights")
-def get_flights():
-    return _get_flights()
+async def get_flights():
+    return await _get_flights()
 
 
 @app.post("/flights")
-def add_flight(flight: Flight):
-    flights = _get_flights()
+async def add_flight(flight: Flight):
+    flights = await _get_flights()
     new_flight = flight.model_dump()
     max_id = max((item["id"] for item in flights), default=0)
     new_flight["id"] = max_id + 1
     flights.append(new_flight)
-    _set_flights(flights)
+    await _set_flights(flights)
     return {"message": "flight added"}
 
 
 @app.post("/book-flight/", response_model=Flight)
-def book_flight(booking_request: BookingRequest):
-    flights = _get_flights()
+async def book_flight(booking_request: BookingRequest):
+    flights = await _get_flights()
     flight_id = booking_request.flight_id
 
     # Check if the flight exists
@@ -160,13 +165,13 @@ def book_flight(booking_request: BookingRequest):
     if flight is None:
         raise HTTPException(status_code=404, detail="Flight not found")
 
-    booked_flights = _get_booked_flights()
+    booked_flights = await _get_booked_flights()
     booked_flights.append(booking_request.model_dump())
-    _set_booked_flights(booked_flights)
+    await _set_booked_flights(booked_flights)
 
     return flight
 
 
 @app.get("/booked-flights", response_model=List[BookingRequest])
-def get_booked_flights():
-    return _get_booked_flights()
+async def get_booked_flights():
+    return await _get_booked_flights()
