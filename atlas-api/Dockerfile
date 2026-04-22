@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY api/ /app/api/
 
 # Set environment variables
-ENV PYTHONPATH "${PYTHONPATH}:/app"
+ENV PYTHONPATH=/app
 
 # Command to run the FastAPI application
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
