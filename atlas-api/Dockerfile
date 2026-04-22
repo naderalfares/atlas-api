@@ -1,5 +1,5 @@
-# Use the official Python image from Docker Hub
-FROM python:3.9-slim
+# Use the official Python image from Docker Hub (pickledb>=1.4 needs Python 3.10+)
+FROM python:3.11-slim
 
 # Set the working directory inside the container
 WORKDIR /app
